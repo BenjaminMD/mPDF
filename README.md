@@ -3,6 +3,8 @@
 ### Overview:
 This module is an extension of `ezfit` and aims to incorporate the magnetic PDF fit into the fitting process. It contains the mPDF function for the total PDF calculator.
 
+- `main.ipynb` show cases the usage and contains en example fit
+
 ### Description:
 The mPDF function calculates the "unnormalized" magnetic pair distribution function (mPDF) based on provided scale factors and correlation length.
 
