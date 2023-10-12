@@ -1,0 +1,34 @@
+[PDF]
+qbroad = 0.055
+qdamp =  0.05
+[Measurement]
+keV = 59.798
+[R_val]
+rmin = 1
+rmax = 20
+rstep = 0.01
+[files]
+cifs = './cifs/'
+out = './results/'
+[Verbose]
+step = true
+results = true
+
+[Restraints]
+#delta2 = [0.0, 8.0, 1.0]
+#scale = [0.0, 1.0, 0.1]
+#adp = [0.0, 5.0, 0.1]
+#lat = 2.5
+
+[[param_order]]
+free = ["lat", "scale"]
+fix = []
+
+
+[[param_order]]
+free = ["delta2", "adp"]
+fix = []
+
+[[param_order]]
+free = ["mag"]
+fix = []
