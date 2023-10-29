@@ -39,18 +39,21 @@ class MPDF_Wrapper:
             rmaxAtoms=self.rmax,
             ffparamkey=ffparamkey
         )
-        mspec.strucIdxs = [strucIdxs] # determined from previous inspection of the unit cell
+        mspec.strucIdxs = strucIdxs # determined from previous inspection of the unit cell
         mspec.basisvecs = np.array(basisvecs) # any vector perpendicular to the c axis will be fine
         mspec.kvecs = np.array(kvecs)
         setattr(self.species, name, mspec)
         
     def set_up_MagCalc(self):
-        self.mstruc = MagStructure(rmaxAtoms=self.rmax)
+        self.mstruc = MagStructure(rmaxAtoms=self.rmax) 
         species = [s for s in dir(self.species) if not s.startswith("__")]
         for spec in species:
             mspec = getattr(self.species, spec)
             self.mstruc.loadSpecies(mspec)
+            
+
         self.mstruc.makeAll()
+        
         mc = MPDFcalculator(
             magstruc=self.mstruc,
             qdamp=self.qdamp,

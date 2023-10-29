@@ -10,7 +10,7 @@ class AttrDict:
         return str(self.__dict__)
     
 
-def r_gr_mgr(fit):
+def r_gr_mgr(fit, mfit):
     prof = fit.recipe._contributions['PDF'].profile
 
     r = prof.x
