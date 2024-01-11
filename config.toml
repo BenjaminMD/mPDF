@@ -5,7 +5,7 @@ qdamp =  0.05
 keV = 59.798
 [R_val]
 rmin = 1
-rmax = 20
+rmax = 30
 rstep = 0.01
 [files]
 cifs = './cifs/'
@@ -15,13 +15,13 @@ step = true
 results = true
 
 [Restraints]
-#delta2 = [0.0, 8.0, 1.0]
-#scale = [0.0, 1.0, 0.1]
-#adp = [0.0, 5.0, 0.1]
-#lat = 2.5
+delta2 = [0.0, 8.0, 1.0]
+scale = [0.0, 10.0, 6.283]
+adp = [0.0, 5.0]
+lat = 0.5
 
 [[param_order]]
-free = ["lat", "scale"]
+free = ["lat"]
 fix = []
 
 

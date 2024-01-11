@@ -44,14 +44,15 @@ class MPDF_Wrapper:
         mspec.kvecs = np.array(kvecs)
         setattr(self.species, name, mspec)
         
-    def set_up_MagCalc(self):
+    def set_up_MagStruc(self):
         self.mstruc = MagStructure(rmaxAtoms=self.rmax) 
+        
+    def set_up_MagCalc(self):
         species = [s for s in dir(self.species) if not s.startswith("__")]
         for spec in species:
             mspec = getattr(self.species, spec)
             self.mstruc.loadSpecies(mspec)
             
-
         self.mstruc.makeAll()
         
         mc = MPDFcalculator(
