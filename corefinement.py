@@ -1,19 +1,47 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import typing
 from diffpy.mpdf import *
+from pathlib import Path
+from ezplot import plot_defaults
+from diffpy.mpdf.mciftools import create_from_mcif
 from diffpy.srfit.fitbase import FitContribution, FitRecipe, FitResults, Profile
 from diffpy.srfit.pdf import PDFGenerator, PDFParser
 from diffpy.structure import loadStructure
 from diffpy.structure.parsers import getParser
 from scipy.optimize import least_squares
 
+from glob import glob
+
+def _get_tags(phase: str, param: str) -> typing.List[str]:
+    return [param, phase, "{}_{}".format(phase, param)]
+
+
+def _get_name(*args: str) -> str:
+    return "_".join(args)
+
+
+def _rename_par(name: str, atoms: list) -> str:
+    parts = name.split("_")
+    np = len(parts)
+    na = len(atoms)
+    if np > 1 and parts[1].isdigit() and -1 < int(parts[1]) < na:
+        parts[1] = atoms[int(parts[1])].name
+        parts = parts[::-1]
+    return "_".join(parts)
+
 
 def main():
-    rhombo_struc = loadStructure("TB3Ni.cif")
-    print(rhombo_struc)
+    for dataFile in glob('./1_data/Tb3Ni*.gr'):
+
+        structureFile = '0_cifs/Tb3Ni.cif'
+        combined_fit(dataFile, structureFile, rmin=0.2, rmax=20, method='corefinement')
 
 
 def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinement"):
+    dF = Path(dataFile)
+    Temperature = dataFile.split("@")[-1].split(".")[0][:-1]
+    print(dataFile, Temperature)
     """
     method = 'corefinement': true simultaneous corefinement
     of atomic and magnetic parameters
@@ -31,8 +59,8 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
     profile.loadParsedData(parser)
 
     # define qdamp and qbroad (determined previously from calibration fits)
-    qdamp = 0.025
-    qbroad = 0.025
+    qdamp = 0.04
+    qbroad = 0.09
 
     # set up calculation range for the PDF simulation
     rstep = 0.01
@@ -59,8 +87,9 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
     )  # this gives the desired AF structure for this choice of unit cell
 
     # set up the MagStructure
-    mstruc = MagStructure(rmaxAtoms=rmax)
-    mstruc.loadSpecies(mspec)
+    mstruc = create_from_mcif("./0_cifs/Tb3Ni@58K.mcif", ffparamkey="Tb3")
+    #mstruc = MagStructure(rmaxAtoms=rmax)
+    #mstruc.loadSpecies(mspec)
     mstruc.makeAll()  ### populates the spin and atom arrays
 
     # create the MPDFcalculator for MnO
@@ -112,10 +141,27 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
     for par in sgpars.adppars:
         fit.addVar(par, value=0.003, tag="ADPs")
 
+
     # note that there are no positional degrees of freedom (i.e. xyz parameters) for this structure
+    atoms = nucpdf.phase.getScatterers()
+    name: str = nucpdf.name
+    sgpars = constrainAsSpaceGroup(nucpdf.phase, pcif.spacegroup.short_name)
+    xyzpars = sgpars.xyzpars
+    for par in xyzpars:
+        par_name = _rename_par(par.name, atoms)
+        try:
+            fit.addVar(
+                par,
+                name=_get_name(name, par_name),
+                fixed=True,
+                tags=_get_tags(name, "xyz") + [nucpdf.phase.name]
+            )
+        except ValueError:
+            print(f'{name}_{par_name} is constrained')
+
 
     fit.addVar(totpdf.nucscale, 0.05, name="nucscale")
-    fit.addVar(nucpdf.delta1, value=1.0, name="delta1")
+    fit.addVar(nucpdf.delta2, value=2.0, name="delta2")
 
     # mPDF parameters
     fit.addVar(totpdf.parascale, 0, tag="Mag")
@@ -147,8 +193,13 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
         print(fit.names)
         least_squares(fit.residual, fit.values)
 
+        # add the ADps
+        fit.free("xyz")
+        print(fit.names)
+        least_squares(fit.residual, fit.values)
+
         # add delta1
-        fit.free("delta1")
+        fit.free("delta2")
         print(fit.names)
         least_squares(fit.residual, fit.values)
 
@@ -178,7 +229,7 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
             least_squares(fit.residual, fit.values)
 
             # add delta1
-            fit.free("delta1")
+            fit.free("delta2")
             print(fit.names)
             least_squares(fit.residual, fit.values)
 
@@ -203,28 +254,32 @@ def combined_fit(dataFile, structureFile, rmin=1.5, rmax=20.0, method="corefinem
         fit.ordscale.value, fit.parascale.value, fit.th.value, fit.phi.value
     )  # just mPDF
     nuccalc = totcalc - magcalc  # just atomic PDF
-    baseline = 1.2 * gobs.min()
+    baseline = 1.6 * gobs.min()
     nucdiff = gobs - nuccalc
     totdiff = gobs - totcalc  # total fit residual
     results = FitResults(fit)
-    print("Rw = " + str(results.rw))
+    results.saveResults(f"XYZ_Results_{dF.stem}.res")
 
-    # Plot the structural refinement
-    ax = plt.figure().add_subplot(111)
-    ax.plot(
-        r, gobs, "bo", label="G(r) data", markerfacecolor="none", markeredgecolor="b"
-    )
-    ax.plot(r, totcalc, "r-", lw=1.5, label="Total fit")
-    ax.plot(r, nucdiff + baseline, marker="o", mec="Gray", mfc="None")
-    ax.plot(r, magcalc + baseline, marker="None", color="Blue", lw=2, label="mPDF fit")
-    ax.plot(r, totdiff + 1.4 * baseline, "g-")
-    ax.plot(r, np.zeros_like(r) + 1.4 * baseline, "k:")
+    
+
+    fig, gs = plot_defaults(1, 1)
+    ax = fig.add_subplot(gs[0, 0])
+    ax.set_xlim(1, max(r))
+    ax.set_ylim(-25, 40)
+
+    
 
     ax.set_xlabel(r"r ($\mathdefault{\AA}$)")
     ax.set_ylabel(r"G ($\mathdefault{\AA^{-2}}$)")
-    plt.legend()
+    ax.plot(r, gobs, "bo", label="obs", markerfacecolor="none", markeredgecolor="C0",  markersize=2, alpha=0.9)
+    ax.plot(r, totcalc, label="fit", alpha=1, color="C1")
+    ax.plot(r, magcalc + baseline, marker="None", color="C3", lw=2, label="mPDF")
+    ax.plot(r, np.zeros_like(r) + 1.4 * baseline, "k", linewidth=0.1)
+    ax.plot(r, totdiff + 1.4 * baseline, "g-", label="diff")
+    ax.plot([],[], label=f"T = {Temperature} K", linestyle="")
+    plt.legend(frameon=False, ncol=3, fontsize=10)
 
-    plt.show()
+    plt.savefig(f"XYZ_Plot_{dF.stem}.pdf")
 
 
 if __name__ == "__main__":
